@@ -1,0 +1,27 @@
+{
+  "description": "Stop-only: review→fix loop, then lint fix, finally end",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/review_on_stop.py",
+            "timeout": 45000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/review_on_stop.py --subagent",
+            "timeout": 45000
+          }
+        ]
+      }
+    ]
+  }
+}

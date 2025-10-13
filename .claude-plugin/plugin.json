@@ -1,0 +1,6 @@
+{
+  "name": "review-loop-plugin",
+  "version": "1.0.0",
+  "description": "Stop時にレビュー→修正ループ→リンター修正→終了まで自動化（PostToolUse不使用）",
+  "hooks": "./hooks/hooks.json"
+}
