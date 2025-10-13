@@ -4,16 +4,15 @@
 将来的な拡張のための基本構造を提供する。
 現在は review_on_stop.py に統合されているが、より複雑な差分処理が必要になった場合に使用。
 """
-import subprocess
 import pathlib
-from typing import List, Tuple, Optional
+import subprocess
 
 
 def run_command(
-    cmd: List[str],
-    cwd: Optional[pathlib.Path] = None,
+    cmd: list[str],
+    cwd: pathlib.Path | None = None,
     timeout: int = 30
-) -> Tuple[int, str, str]:
+) -> tuple[int, str, str]:
     """コマンドを実行して結果を返す"""
     try:
         p = subprocess.run(
@@ -30,15 +29,40 @@ def run_command(
         return 1, "", str(e)
 
 
-def get_git_diff_files(root: pathlib.Path, ref: str = "HEAD") -> List[str]:
+def get_git_diff_files(root: pathlib.Path, ref: str = "HEAD") -> list[str]:
     """Git で変更されたファイル一覧を取得"""
-    code, output, _ = run_command(
-        ["git", "diff", "--name-only", ref],
-        cwd=root
-    )
+    code, _, _ = run_command(["git", "rev-parse", "--git-dir"], cwd=root)
     if code != 0:
         return []
-    return [f for f in output.splitlines() if f]
+
+    tracked: list[str] = []
+    code, _, _ = run_command(["git", "rev-parse", "--verify", ref], cwd=root)
+    if code == 0:
+        diff_code, output, _ = run_command(
+            ["git", "diff", "--name-only", ref],
+            cwd=root
+        )
+        if diff_code == 0 and output:
+            tracked = [f for f in output.splitlines() if f]
+    else:
+        ls_code, output, _ = run_command(["git", "ls-files"], cwd=root)
+        if ls_code == 0 and output:
+            tracked = [f for f in output.splitlines() if f]
+
+    untracked: list[str] = []
+    others_code, others_out, _ = run_command(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=root
+    )
+    if others_code == 0 and others_out:
+        untracked = [f for f in others_out.splitlines() if f]
+
+    targets = tracked[:]
+    for path in untracked:
+        if path not in targets:
+            targets.append(path)
+
+    return targets
 
 
 def get_git_diff_unified(
@@ -47,13 +71,34 @@ def get_git_diff_unified(
     unified: int = 0
 ) -> str:
     """Git で unified 形式の差分を取得"""
-    code, output, _ = run_command(
-        ["git", "diff", f"--unified={unified}", ref],
-        cwd=root
-    )
+    code, _, _ = run_command(["git", "rev-parse", "--git-dir"], cwd=root)
     if code != 0:
         return ""
-    return output
+
+    patch_parts: list[str] = []
+    code, _, _ = run_command(["git", "rev-parse", "--verify", ref], cwd=root)
+    if code == 0:
+        diff_code, output, _ = run_command(
+            ["git", "diff", f"--unified={unified}", ref],
+            cwd=root
+        )
+        if diff_code == 0 and output:
+            patch_parts.append(output)
+
+    others_code, others_out, _ = run_command(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=root
+    )
+    if others_code == 0 and others_out:
+        for path in (p for p in others_out.splitlines() if p):
+            diff_code, output, _ = run_command(
+                ["git", "diff", f"--unified={unified}", "--no-index", "/dev/null", path],
+                cwd=root
+            )
+            if diff_code in (0, 1) and output:
+                patch_parts.append(output)
+
+    return "\n\n".join(part for part in patch_parts if part).strip()
 
 
 def summarize_diff(patch: str, max_lines: int = 100) -> str:
@@ -67,9 +112,9 @@ def summarize_diff(patch: str, max_lines: int = 100) -> str:
 
 
 def filter_files_by_extension(
-    files: List[str],
-    extensions: List[str]
-) -> List[str]:
+    files: list[str],
+    extensions: list[str]
+) -> list[str]:
     """拡張子でファイルをフィルタリング"""
     return [
         f for f in files

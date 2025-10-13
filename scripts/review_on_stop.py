@@ -6,18 +6,46 @@ Stop/SubagentStop フック: レビュー→修正ループ→リンター修正
 """
 import json
 import os
-import sys
-import subprocess
 import pathlib
+import subprocess
+import sys
 import time
-from typing import Tuple, List, Dict, Any
+from typing import Any
+
+import diff_utils
 
 ROOT = pathlib.Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
 CTX_DIR = ROOT / ".claude" / "review"
 CTX_PATH = CTX_DIR / "context.json"
 
 
-def run(cmd: List[str]) -> Tuple[int, str, str]:
+def merge_checklist_entries(
+    previous: list[Any],
+    current_targets: list[str]
+) -> list[str]:
+    """既存チェックリストから現状に関連する項目だけを引き継ぐ"""
+    if not isinstance(previous, list):
+        return []
+
+    if not current_targets:
+        return []
+
+    normalized_targets = {
+        t.strip() for t in current_targets if isinstance(t, str) and t.strip()
+    }
+    merged: list[str] = []
+    for entry in previous:
+        if not isinstance(entry, str):
+            continue
+        if ":" in entry:
+            candidate = entry.split(":", 1)[0].strip()
+            if normalized_targets and candidate and candidate not in normalized_targets:
+                continue
+        merged.append(entry)
+    return merged
+
+
+def run(cmd: list[str]) -> tuple[int, str, str]:
     """コマンドを実行して結果を返す"""
     try:
         p = subprocess.run(
@@ -40,36 +68,17 @@ def is_git_repo() -> bool:
     return code == 0
 
 
-def changed_files_unified0() -> Tuple[List[str], str]:
+def changed_files_unified0() -> tuple[list[str], str]:
     """変更されたファイルと unified=0 の差分を取得"""
     if not is_git_repo():
         return [], ""
 
-    # HEAD が存在するか確認
-    code, _, _ = run(["git", "rev-parse", "--verify", "HEAD"])
-    if code != 0:
-        # 初回コミット前の場合、追跡されているファイルをすべて対象にする
-        code, files, _ = run(["git", "ls-files"])
-        if code == 0 and files:
-            targets = [f for f in files.splitlines() if f]
-            return targets, ""
-        return [], ""
-
-    # 変更ファイル一覧を取得
-    code, files, _ = run(["git", "diff", "--name-only", "HEAD"])
-    if code != 0:
-        return [], ""
-
-    # unified=0 の差分を取得
-    code, patch, _ = run(["git", "diff", "--unified=0", "HEAD"])
-    if code != 0:
-        patch = ""
-
-    targets = [f for f in files.splitlines() if f]
+    targets = diff_utils.get_git_diff_files(ROOT)
+    patch = diff_utils.get_git_diff_unified(ROOT)
     return targets, patch
 
 
-def load_context() -> Dict[str, Any]:
+def load_context() -> dict[str, Any]:
     """既存の context.json を読み込む（存在しない場合は空の構造を返す）"""
     if not CTX_PATH.exists():
         return {
@@ -89,7 +98,7 @@ def load_context() -> Dict[str, Any]:
         }
 
 
-def build_context() -> Dict[str, Any]:
+def build_context() -> dict[str, Any]:
     """コンテキストを構築して保存"""
     targets, patch = changed_files_unified0()
 
@@ -114,7 +123,7 @@ def build_context() -> Dict[str, Any]:
     return ctx
 
 
-def should_allow_stop(ctx: Dict[str, Any]) -> bool:
+def should_allow_stop(ctx: dict[str, Any]) -> bool:
     """停止を許可すべきかどうかを判定"""
     # 変更がない場合は停止を許可
     if not ctx["review"]["targets"]:
@@ -127,7 +136,7 @@ def should_allow_stop(ctx: Dict[str, Any]) -> bool:
     return False
 
 
-def generate_reason(ctx: Dict[str, Any]) -> str:
+def generate_reason(ctx: dict[str, Any]) -> str:
     """次に実行すべきアクションを生成"""
     ctx_path_rel = CTX_PATH.relative_to(ROOT)
 
@@ -144,15 +153,12 @@ def generate_reason(ctx: Dict[str, Any]) -> str:
     # チェックリストが空でリンターが pending の場合
     if ctx["lint"]["status"] == "pending":
         return (
-            f"レビューが完了しました。次の順序でリンター修正を行ってください：\n"
-            f"1) /clear でコンテキストをリセットする\n"
-            f"2) Read ツールで {ctx_path_rel} を読み込む\n"
-            f"3) `review.patchUnified0` と `targets` を基にレビュー実施\n"
-            f"4) 指摘は `review.checklist` に列挙し、空になるまで修正と再レビューを反復\n"
-            f"5) checklist が空になったら `lint.status` を 'in_progress' に更新\n"
-            f"6) リンター（eslint/ruff等）を実行してエラーを修正\n"
-            f"7) エラー0を確認したら `lint.status` を 'done' に更新\n"
-            f"8) 次の停止で終了"
+            f"レビューを開始します。次の手順で進めてください：\n"
+            f"1) Task ツールを使って reviewer エージェントを起動\n"
+            f"2) エージェントが {ctx_path_rel} を基にレビューを実施\n"
+            f"3) エージェントが指摘を `review.checklist` に列挙し、修正を実施\n"
+            f"4) エージェントが checklist を空にしたら `lint.status` を 'in_progress' に更新\n"
+            f"5) 次の停止でリンター修正に進む"
         )
 
     # リンターが in_progress の場合
@@ -172,20 +178,33 @@ def generate_reason(ctx: Dict[str, Any]) -> str:
 def main():
     """メイン処理"""
     try:
-        # stdin から入力を読み込む
-        hook_in = json.load(sys.stdin)
-
         # 既存のコンテキストを読み込む
         existing_ctx = load_context()
 
         # 新しいコンテキストを構築
         ctx = build_context()
 
-        # 既存のチェックリストとリンターステータスを引き継ぐ
-        if existing_ctx.get("review", {}).get("checklist"):
-            ctx["review"]["checklist"] = existing_ctx["review"]["checklist"]
-        if existing_ctx.get("lint", {}).get("status"):
-            ctx["lint"]["status"] = existing_ctx["lint"]["status"]
+        prev_review = existing_ctx.get("review", {}) if isinstance(existing_ctx, dict) else {}
+        prev_targets = prev_review.get("targets", [])
+        prev_patch = prev_review.get("patchUnified0", "")
+        review_unchanged = (
+            ctx["review"]["targets"] == prev_targets
+            and ctx["review"]["patchUnified0"] == prev_patch
+        )
+
+        # 既存のチェックリストは差分変化時も可能な範囲で引き継ぐ
+        carried = merge_checklist_entries(
+            prev_review.get("checklist", []),
+            ctx["review"]["targets"]
+        )
+        if carried:
+            ctx["review"]["checklist"] = carried
+
+        # リンターステータスは差分が変わっていない場合のみ引き継ぐ
+        prev_lint = existing_ctx.get("lint", {}) if isinstance(existing_ctx, dict) else {}
+        prev_lint_status = prev_lint.get("status")
+        if review_unchanged and prev_lint_status:
+            ctx["lint"]["status"] = prev_lint_status
 
         # 更新したコンテキストを保存
         with open(CTX_PATH, "w", encoding="utf-8") as f:
@@ -193,7 +212,7 @@ def main():
 
         # 停止を許可すべきか判定
         if should_allow_stop(ctx):
-            print(json.dumps({"decision": None}))
+            print(json.dumps({}))
             return
 
         # 停止をブロックして次のアクションを指示
