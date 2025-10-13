@@ -1,0 +1,33 @@
+{
+  "name": "review-loop-marketplace",
+  "owner": {
+    "name": "Claude Code Plugin Developer",
+    "url": "https://github.com/nakashimatakeo"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for automated code review and quality improvement",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "review-loop-plugin",
+      "source": "./",
+      "description": "Stop時にレビュー→修正ループ→リンター修正→終了まで自動化",
+      "version": "1.0.0",
+      "author": {
+        "name": "Claude Code Plugin Developer",
+        "url": "https://github.com/nakashimatakeo"
+      },
+      "homepage": "https://github.com/nakashimatakeo/review-loop-plugin",
+      "license": "MIT",
+      "keywords": [
+        "review",
+        "code-review",
+        "automation",
+        "lint",
+        "quality",
+        "stop-hook"
+      ]
+    }
+  ]
+}
