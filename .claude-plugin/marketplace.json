@@ -13,7 +13,7 @@
       "name": "review-loop-plugin",
       "source": "./",
       "description": "Stop時にレビュー→修正ループ→リンター修正→終了まで自動化",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "author": {
         "name": "Claude Code Plugin Developer",
         "url": "https://github.com/nakashimatakeo"
