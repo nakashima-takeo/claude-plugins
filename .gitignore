@@ -26,6 +26,3 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Claude Code generated
-.claude/

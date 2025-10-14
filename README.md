@@ -4,7 +4,7 @@
 
 ## 概要
 
-`/review` コマンドで起動し、以下の処理を自動化：
+`/changes-review` コマンドで起動し、以下の処理を自動化：
 
 1. Git差分から変更ファイルを特定
 2. reviewer エージェントによる重要度付きレビュー
@@ -15,7 +15,7 @@
 
 ## 特徴
 
-- **明示的な起動**: `/review` コマンドで実行（フック不要）
+- **明示的な起動**: `/changes-review` コマンドで実行（フック不要）
 - **重要度付きレビュー**: 高・中・低の3段階で優先度を明確化
 - **関心の分離**: reviewerはレビューのみ、orchestratorが修正を担当
 - **自動ループ**: 重要度「中」以上がなくなるまで自動反復
@@ -61,12 +61,12 @@ git clone <this-repo-url> .claude-plugins/review-loop-plugin
 
 ### 動作確認
 
-Claude Code を起動して `/review` コマンドが利用可能か確認：
+Claude Code を起動して `/changes-review` コマンドが利用可能か確認：
 
 ```bash
 # Claude Code で以下を実行
 /help
-# /review が表示されることを確認
+# /changes-review が表示されることを確認
 ```
 
 ## プラグイン構造
@@ -78,7 +78,7 @@ review-loop-plugin/
 │   └── marketplace.json      # マーケットプレイス情報
 ├── .claude/
 │   └── commands/
-│       └── review.md         # /review コマンド定義
+│       └── changes-review.md # /changes-review コマンド定義
 ├── agents/
 │   ├── orchestrator.md       # ループ制御エージェント
 │   └── reviewer.md           # レビュー専門エージェント
@@ -109,7 +109,7 @@ review-loop-plugin/
 ### 基本的な使い方
 
 1. コードを編集
-2. Claude Codeで `/review` コマンドを実行
+2. Claude Codeで `/changes-review` コマンドを実行
 3. orchestrator エージェントが自動的に：
    - 変更ファイルを特定
    - reviewer エージェントでレビュー
@@ -122,7 +122,7 @@ review-loop-plugin/
 
 ```mermaid
 flowchart TD
-    start[/review コマンド] --> orchestrator[orchestrator起動]
+    start[/changes-review コマンド] --> orchestrator[orchestrator起動]
     orchestrator --> git[Git差分取得]
     git --> reviewer[reviewer起動]
     reviewer --> check{重要度中以上<br/>の指摘あり？}
