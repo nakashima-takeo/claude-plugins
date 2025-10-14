@@ -1,142 +1,168 @@
 # review-loop-plugin
 
-Stop時にレビュー→修正ループ→リンター修正を自動化するClaude Codeプラグイン
+コードレビュー→修正ループを自動化するClaude Codeプラグイン
 
 ## 概要
 
-エージェントが停止（Stop/SubagentStop）したタイミングでフックを発火し、以下の処理を自動化：
+`/review` コマンドで起動し、以下の処理を自動化：
 
-1. エージェント停止
-2. 専用の reviewer エージェントによるレビュー実施
-3. レビュー指摘がなくなるまで修正を継続
-4. リンターエラー修正
-5. 終了
-
-PostToolUseは使用せず、Stop系イベントのみで制御することで、開発テンポを維持します。
+1. Git差分から変更ファイルを特定
+2. reviewer エージェントによる重要度付きレビュー
+3. 重要度「高」「中」の指摘を修正
+4. 重要度「中」以上の指摘がなくなるまで2-3を繰り返す
+5. リンター修正
+6. 完了
 
 ## 特徴
 
-- **専用レビューエージェント**: 別エージェントによるフレッシュな視点でのレビュー
-- **状態管理**: `.claude/review/context.json`で進捗を追跡
-- **自律的な反復**: エージェントが自分でチェックリストを更新しながら修正を継続
-- **軽量動作**: Stop フックは指示生成のみに徹し、実作業はエージェントに委譲
+- **明示的な起動**: `/review` コマンドで実行（フック不要）
+- **重要度付きレビュー**: 高・中・低の3段階で優先度を明確化
+- **関心の分離**: reviewerはレビューのみ、orchestratorが修正を担当
+- **自動ループ**: 重要度「中」以上がなくなるまで自動反復
 
 ## インストール
 
-1. Claude Codeのプラグインディレクトリにクローン：
+### グローバルインストール（すべてのプロジェクトで使用）
+
+1. ホームディレクトリにプラグインをクローン：
 
 ```bash
-cd ~/.claude/plugins  # またはプロジェクト固有のプラグインディレクトリ
-git clone <this-repo> review-loop-plugin
+cd ~
+git clone <this-repo-url> review-loop-plugin
 ```
 
-2. プラグインを有効化：
+2. Claude Code の設定ファイル（`~/.claude/config.json`）に追加：
 
-Claude Codeの設定でプラグインを有効化してください。
+```json
+{
+  "plugins": [
+    "~/review-loop-plugin"
+  ]
+}
+```
+
+### プロジェクト固有インストール
+
+1. プロジェクトのルートディレクトリで：
+
+```bash
+git clone <this-repo-url> .claude-plugins/review-loop-plugin
+```
+
+2. プロジェクトの `.claude/config.json` に追加：
+
+```json
+{
+  "plugins": [
+    ".claude-plugins/review-loop-plugin"
+  ]
+}
+```
+
+### 動作確認
+
+Claude Code を起動して `/review` コマンドが利用可能か確認：
+
+```bash
+# Claude Code で以下を実行
+/help
+# /review が表示されることを確認
+```
 
 ## プラグイン構造
 
 ```
 review-loop-plugin/
-├── agents/                    # カスタムエージェント
-│   └── reviewer.md           # コードレビュー専用エージェント
-├── hooks/
-│   └── hooks.json            # Stop/SubagentStop フック定義
-├── scripts/
-│   ├── diff_utils.py         # Git差分取得ユーティリティ
-│   └── review_on_stop.py     # フックスクリプト
+├── .claude-plugin/
+│   ├── plugin.json           # プラグイン定義
+│   └── marketplace.json      # マーケットプレイス情報
+├── .claude/
+│   └── commands/
+│       └── review.md         # /review コマンド定義
+├── agents/
+│   ├── orchestrator.md       # ループ制御エージェント
+│   └── reviewer.md           # レビュー専門エージェント
 └── README.md
 ```
 
-### reviewer エージェント
+**ディレクトリの役割:**
+- `.claude-plugin/`: プラグインのメタデータ
+- `.claude/commands/`: Slash コマンド定義
+- `agents/`: カスタムエージェント定義
 
-プラグインには `reviewer` エージェントが含まれており、以下の処理を自動的に実行します：
+### エージェント構成
 
-- `.claude/review/context.json` を読み込み
-- `patchUnified0` と `targets` を基にコードレビュー
-- 指摘事項を `review.checklist` に列挙
-- チェックリストの各項目を修正
-- すべて解消したら `lint.status` を `'in_progress'` に更新
+#### orchestrator エージェント
+- レビュー→修正ループ全体を制御
+- Git差分から変更ファイルを特定
+- reviewer エージェントを起動してレビューを依頼
+- 重要度「高」「中」の指摘を修正
+- リンター実行・修正
+
+#### reviewer エージェント
+- コードレビュー専門（修正は行わない）
+- 重要度付き指摘を出力
+- 使用可能ツール: Read, Grep, Glob, Bash（Gitのみ）
 
 ## 使用方法
 
-プラグインを有効化すると、エージェント停止時に自動的にフックが実行されます。
-
-### 基本フロー
+### 基本的な使い方
 
 1. コードを編集
-2. エージェントが停止
-3. Stopフックが`context.json`を生成し、次のアクションを指示
-4. Task tool で reviewer エージェントを起動
-5. reviewer エージェントがレビュー→修正を反復
-6. レビュー完了後、リンター修正に進む
-7. すべて解消で終了
+2. Claude Codeで `/review` コマンドを実行
+3. orchestrator エージェントが自動的に：
+   - 変更ファイルを特定
+   - reviewer エージェントでレビュー
+   - 重要度「高」「中」の指摘を修正
+   - 重要度「中」以上がなくなるまで繰り返す
+   - リンター修正
+   - 完了報告
 
-### 状態ファイル
+### フロー図
 
-`.claude/review/context.json`の構造：
-
-```json
-{
-  "generatedAt": "2025-10-14T00:00:00Z",
-  "review": {
-    "targets": ["src/a.ts", "src/b.ts"],
-    "patchUnified0": "diff --git ...",
-    "checklist": [
-      "変数名をキャメルケースに統一",
-      "エラーハンドリングを追加"
-    ]
-  },
-  "lint": {
-    "tools": ["eslint", "ruff"],
-    "status": "pending"
-  }
-}
+```mermaid
+flowchart TD
+    start[/review コマンド] --> orchestrator[orchestrator起動]
+    orchestrator --> git[Git差分取得]
+    git --> reviewer[reviewer起動]
+    reviewer --> check{重要度中以上<br/>の指摘あり？}
+    check -- あり --> fix[orchestratorが修正]
+    fix --> reviewer
+    check -- なし --> lint[リンター修正]
+    lint --> done[完了]
 ```
 
-- `review.checklist`: Claudeが自律的に埋めて解消していく項目
-- `lint.status`: `pending` → `in_progress` → `done`
+## レビュー重要度
+
+### 重要度「高」
+セキュリティリスク、重大なバグ、データ損失リスク等
+
+### 重要度「中」
+コーディング規約違反、変数名の不明瞭さ、エラーハンドリング不足等
+
+### 重要度「低」
+コメント不足、リファクタリング提案等
+
+**ループ終了条件**: 重要度「中」以上の指摘がなくなった時点で終了
 
 ## 設定
 
-### タイムアウト
-
-`hooks/hooks.json`でタイムアウトを調整可能（デフォルト45秒）：
-
-```json
-{
-  "type": "command",
-  "command": "${CLAUDE_PLUGIN_ROOT}/scripts/review_on_stop.py",
-  "timeout": 45000
-}
-```
-
 ### リンター
 
-`scripts/review_on_stop.py`の`lint.tools`配列でリンターを設定：
+orchestrator.md で使用するリンターを変更可能：
 
-```python
-"lint": {
-    "tools": ["eslint", "ruff", "mypy"],
-    "status": "pending"
-}
-```
+- TypeScript/JavaScript: `npx eslint . --fix`
+- Python: `ruff check . --fix`
 
-## デバッグ
+### 最大反復回数
 
-```bash
-# フック実行の詳細ログを確認
-claude --debug
-
-# 登録されたフックを確認
-/hooks
-```
+orchestrator.md でループの最大反復回数を調整可能（デフォルト: 5回）
 
 ## 注意事項
 
-- フックは任意のコマンドを実行できるため、信頼できる環境でのみ使用してください
 - Git リポジトリでの使用を推奨（差分検出のため）
-- Python 3.6以上が必要
+- 大規模な変更の場合、レビューに時間がかかる可能性があります
+- 無限ループを避けるため、最大5回の反復で強制終了します
 
 ## ライセンス
 
