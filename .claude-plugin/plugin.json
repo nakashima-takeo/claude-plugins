@@ -1,7 +1,7 @@
 {
   "name": "review-loop-plugin",
-  "version": "2.0.0",
-  "description": "コードレビュー→修正ループ→リンター修正を自動化するプラグイン",
+  "version": "3.0.0",
+  "description": "メインセッション制御によるコードレビュー→修正ループ自動化プラグイン",
   "author": {
     "name": "Claude Code Plugin Developer",
     "url": "https://github.com/nakashimatakeo"

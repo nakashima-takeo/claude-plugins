@@ -9,16 +9,43 @@
 1. Git差分から変更ファイルを特定
 2. reviewer エージェントによる重要度付きレビュー
 3. 重要度「高」「中」の指摘を修正
-4. 重要度「中」以上の指摘がなくなるまで2-3を繰り返す
+4. 重要度「中」以上の指摘がなくなるまで2-3を繰り返す（最大5回）
 5. リンター修正
-6. 完了
+6. 完了報告
 
 ## 特徴
 
-- **明示的な起動**: `/changes-review` コマンドで実行（フック不要）
-- **重要度付きレビュー**: 高・中・低の3段階で優先度を明確化
-- **関心の分離**: reviewerはレビューのみ、orchestratorが修正を担当
 - **自動ループ**: 重要度「中」以上がなくなるまで自動反復
+- **重要度付きレビュー**: 高・中・低の3段階で優先度を明確化
+- **関心の分離**: reviewerはレビューのみ、メインセッションが修正を担当
+- **無限ループ防止**: 最大5回または同じ指摘が3回続いた時点で終了
+
+## アーキテクチャ
+
+```
+/changes-review コマンド (メインセッション)
+    ↓
+  Git差分取得
+    ↓
+  ┌─────────────────┐
+  │ レビューループ  │ (最大5回)
+  │ ┌─────────────┐ │
+  │ │ reviewer    │ │ ← Taskツールで起動
+  │ │ エージェント │ │
+  │ └─────────────┘ │
+  │       ↓         │
+  │ 指摘をパース    │
+  │       ↓         │
+  │ 修正実施        │ ← メインセッションが実行
+  │       ↓         │
+  │ 重要度「中」以上│
+  │ あり？          │
+  └─────────────────┘
+    ↓ なし
+  リンター修正
+    ↓
+  完了報告
+```
 
 ## インストール
 
@@ -79,7 +106,6 @@ review-loop-plugin/
 ├── commands/
 │   └── changes-review.md     # /changes-review コマンド定義
 ├── agents/
-│   ├── orchestrator.md       # ループ制御エージェント
 │   └── reviewer.md           # レビュー専門エージェント
 └── README.md
 ```
@@ -90,13 +116,6 @@ review-loop-plugin/
 - `agents/`: カスタムエージェント定義
 
 ### エージェント構成
-
-#### orchestrator エージェント
-- レビュー→修正ループ全体を制御
-- Git差分から変更ファイルを特定
-- reviewer エージェントを起動してレビューを依頼
-- 重要度「高」「中」の指摘を修正
-- リンター実行・修正
 
 #### reviewer エージェント
 - コードレビュー専門（修正は行わない）
@@ -109,7 +128,7 @@ review-loop-plugin/
 
 1. コードを編集
 2. Claude Codeで `/changes-review` コマンドを実行
-3. orchestrator エージェントが自動的に：
+3. メインセッションが自動的に：
    - 変更ファイルを特定
    - reviewer エージェントでレビュー
    - 重要度「高」「中」の指摘を修正
@@ -121,11 +140,10 @@ review-loop-plugin/
 
 ```mermaid
 flowchart TD
-    start[/changes-review コマンド] --> orchestrator[orchestrator起動]
-    orchestrator --> git[Git差分取得]
+    start[/changes-review コマンド] --> git[Git差分取得]
     git --> reviewer[reviewer起動]
     reviewer --> check{重要度中以上<br/>の指摘あり？}
-    check -- あり --> fix[orchestratorが修正]
+    check -- あり --> fix[メインセッションが修正]
     fix --> reviewer
     check -- なし --> lint[リンター修正]
     lint --> done[完了]
@@ -148,14 +166,14 @@ flowchart TD
 
 ### リンター
 
-orchestrator.md で使用するリンターを変更可能：
+`commands/changes-review.md` で使用するリンターを変更可能：
 
 - TypeScript/JavaScript: `npx eslint . --fix`
 - Python: `ruff check . --fix`
 
 ### 最大反復回数
 
-orchestrator.md でループの最大反復回数を調整可能（デフォルト: 5回）
+`commands/changes-review.md` でループの最大反復回数を調整可能（デフォルト: 5回）
 
 ## 注意事項
 

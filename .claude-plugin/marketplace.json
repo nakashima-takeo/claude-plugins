@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Claude Code plugins for automated code review and quality improvement",
-    "version": "2.0.0"
+    "version": "3.0.0"
   },
   "plugins": [
     {
       "name": "review-loop-plugin",
       "source": "./",
-      "description": "コードレビュー→修正ループ→リンター修正を自動化するプラグイン",
-      "version": "2.0.0",
+      "description": "メインセッション制御によるコードレビュー→修正ループ自動化プラグイン",
+      "version": "3.0.0",
       "author": {
         "name": "Claude Code Plugin Developer",
         "url": "https://github.com/nakashimatakeo"
