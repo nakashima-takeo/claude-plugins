@@ -76,9 +76,8 @@ review-loop-plugin/
 ├── .claude-plugin/
 │   ├── plugin.json           # プラグイン定義
 │   └── marketplace.json      # マーケットプレイス情報
-├── .claude/
-│   └── commands/
-│       └── changes-review.md # /changes-review コマンド定義
+├── commands/
+│   └── changes-review.md     # /changes-review コマンド定義
 ├── agents/
 │   ├── orchestrator.md       # ループ制御エージェント
 │   └── reviewer.md           # レビュー専門エージェント
@@ -87,7 +86,7 @@ review-loop-plugin/
 
 **ディレクトリの役割:**
 - `.claude-plugin/`: プラグインのメタデータ
-- `.claude/commands/`: Slash コマンド定義
+- `commands/`: スラッシュコマンド定義
 - `agents/`: カスタムエージェント定義
 
 ### エージェント構成

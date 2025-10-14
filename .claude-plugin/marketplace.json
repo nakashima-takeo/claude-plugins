@@ -12,7 +12,7 @@
     {
       "name": "review-loop-plugin",
       "source": "./",
-      "description": "Stop時にレビュー→修正ループ→リンター修正→終了まで自動化",
+      "description": "コードレビュー→修正ループ→リンター修正を自動化するプラグイン",
       "version": "2.0.0",
       "author": {
         "name": "Claude Code Plugin Developer",
@@ -25,8 +25,7 @@
         "code-review",
         "automation",
         "lint",
-        "quality",
-        "stop-hook"
+        "quality"
       ]
     }
   ]
