@@ -1,32 +1,18 @@
 {
-  "name": "review-loop-marketplace",
+  "name": "plugins",
   "owner": {
-    "name": "Claude Code Plugin Developer",
-    "url": "https://github.com/nakashimatakeo"
-  },
-  "metadata": {
-    "description": "Claude Code plugins for automated code review and quality improvement",
-    "version": "3.0.0"
+    "name": "nakashima-takeo",
+    "email": "tonarinototorototoro8972@gmail.com"
   },
   "plugins": [
     {
-      "name": "review-loop-plugin",
-      "source": "./",
-      "description": "メインセッション制御によるコードレビュー→修正ループ自動化プラグイン",
-      "version": "3.0.0",
+      "name": "general",
+      "source": "./plugins/general",
+      "description": "汎用プラグイン",
+      "version": "1.0.0",
       "author": {
-        "name": "Claude Code Plugin Developer",
-        "url": "https://github.com/nakashimatakeo"
-      },
-      "homepage": "https://github.com/nakashimatakeo/review-loop-plugin",
-      "license": "MIT",
-      "keywords": [
-        "review",
-        "code-review",
-        "automation",
-        "lint",
-        "quality"
-      ]
+        "name": "nakashima-takeo"
+      }
     }
   ]
 }
