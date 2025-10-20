@@ -13,6 +13,15 @@
       "author": {
         "name": "nakashima-takeo"
       }
+    },
+    {
+      "name": "test-writer",
+      "source": "./plugins/test-writer",
+      "description": "テストコード作成プラグイン",
+      "version": "1.0.0",
+      "author": {
+        "name": "nakashima-takeo"
+      }
     }
   ]
 }
