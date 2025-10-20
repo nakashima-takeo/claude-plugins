@@ -1,5 +1,8 @@
 {
   "name": "plugins",
+  "metadata": {
+    "description": "個人用Claudeプラグイン集"
+  },
   "owner": {
     "name": "nakashima-takeo",
     "email": "tonarinototorototoro8972@gmail.com"
